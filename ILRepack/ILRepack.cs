@@ -899,14 +899,14 @@ namespace ILRepacking
             foreach (var r in PrimaryAssemblyDefinition.Modules.SelectMany(x => x.Types))
             {
                 VERBOSE("- Importing " + r);
-                Import(r, TargetAssemblyMainModule.Types, false);
+                Import(r.Module.Assembly,r, TargetAssemblyMainModule.Types, false);
             }
             foreach (var m in OtherAssemblies.SelectMany(x => x.Modules))
             {
                 foreach (var r in m.Types)
                 {
                     VERBOSE("- Importing " + r);
-                    Import(r, TargetAssemblyMainModule.Types, ShouldInternalize(r.FullName));
+                    Import(m.Assembly, r, TargetAssemblyMainModule.Types, ShouldInternalize(r.FullName));
                 }
             }
         }
@@ -1870,13 +1870,13 @@ namespace ILRepacking
             return null /*newBody.Instructions.Outside*/;
         }
 
-        internal TypeDefinition Import(TypeDefinition type, Collection<TypeDefinition> col, bool internalize)
+        internal TypeDefinition Import(AssemblyDefinition assembly, TypeDefinition type, Collection<TypeDefinition> col, bool internalize)
         {
             TypeDefinition nt = TargetAssemblyMainModule.GetType(type.FullName);
             bool justCreatedType = false;
             if (nt == null)
             {
-                nt = CreateType(type, col, internalize, null);
+                nt = CreateType(assembly, type, col, internalize, null);
                 justCreatedType = true;
             }
             else if (DuplicateTypeAllowed(type))
@@ -1890,7 +1890,7 @@ namespace ILRepacking
                 string other = "<" + Guid.NewGuid() + ">" + nt.Name;
                 INFO("Renaming " + nt.FullName + " into " + other);
                 nt.Name = other;
-                nt = CreateType(type, col, internalize, null);
+                nt = CreateType(assembly, type, col, internalize, null);
                 justCreatedType = true;
             }
             else if (UnionMerge)
@@ -1906,7 +1906,7 @@ namespace ILRepacking
 
             // nested types first (are never internalized)
             foreach (TypeDefinition nested in type.NestedTypes)
-                Import(nested, nt.NestedTypes, false);
+                Import(assembly, nested, nt.NestedTypes, false);
             foreach (FieldDefinition field in type.Fields)
                 CloneTo(field, nt);
 
@@ -1921,9 +1921,14 @@ namespace ILRepacking
             return nt;
         }
 
-        private TypeDefinition CreateType(TypeDefinition type, Collection<TypeDefinition> col, bool internalize, string rename)
+        private TypeDefinition CreateType(AssemblyDefinition ownerAssembly, TypeDefinition type, Collection<TypeDefinition> col, bool internalize, string rename)
         {
-            TypeDefinition nt = new TypeDefinition(type.Namespace, rename ?? type.Name, type.Attributes);
+            var typeNamespace = type.Namespace;
+            if (internalize)
+            {
+                typeNamespace = string.Format("{0}.{1}", GetNamespacePrefixForAssembly(ownerAssembly), typeNamespace);
+            }
+            TypeDefinition nt = new TypeDefinition(typeNamespace, rename ?? type.Name, type.Attributes);
             col.Add(nt);
 
             // only top-level types are internalized
@@ -1945,6 +1950,12 @@ namespace ILRepacking
             CopyTypeReferences(type.Interfaces, nt.Interfaces, nt);
             CopyCustomAttributes(type.CustomAttributes, nt.CustomAttributes, nt);
             return nt;
+        }
+
+        private string GetNamespacePrefixForAssembly(AssemblyDefinition ownerAssembly)
+        {
+            // replace invalid namespace characters in assembly name
+            return string.Format("{0}.{1}", ownerAssembly.Name.Name.Replace('-', '.'), ownerAssembly.Name.Version);
         }
 
         internal TypeReference CreateReference(ExportedType type)
