@@ -53,7 +53,7 @@ namespace ILRepacking
                     nextDataset.ReadXml(configFile);
                     dataset.Merge(nextDataset);
                 }
-                dataset.WriteXml(repack.OutputFile + ".config");
+                dataset.WriteXml(repack.Options.OutputFile + ".config");
             }
             catch (Exception e)
             {

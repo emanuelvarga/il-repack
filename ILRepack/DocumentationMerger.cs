@@ -69,7 +69,7 @@ namespace ILRepacking
                 }
 
                 // write
-                using (var writer = XmlWriter.Create(Path.ChangeExtension(repack.OutputFile, ".xml"), new XmlWriterSettings() { Indent = true, IndentChars = "    " }))
+                using (var writer = XmlWriter.Create(Path.ChangeExtension(repack.Options.OutputFile, ".xml"), new XmlWriterSettings() { Indent = true, IndentChars = "    " }))
                 {
                     doc.WriteTo(writer);
                 }
